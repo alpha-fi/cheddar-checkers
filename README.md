@@ -1,90 +1,101 @@
-# rusty-checkers
+near-rusty-chekers
+==================
 
-<a href="https://travis-ci.org/dboone/rusty-checkers"><img src="https://travis-ci.org/dboone/rusty-checkers.svg"/></a>
+This app was initialized with [create-near-app]
 
-Checkers game implemented in Rust.
 
-<img align="right" src="http://imgur.com/zleHaok.gif" alt="checkers in 20 moves"/>
+Quick Start
+===========
 
-### Game Play
-The game play consists of each player entering moves until an [end game state](#winning) is reached. The game can be quit at any time by entering `q` or `Q` instead of a move.
+To run this project locally:
 
-### Board
-The board is a regulation 8 by 8 checkers boad. The tiles are indexed using File and Rank. The board is labeled with File `A` through `H`, and Rank `1` through `8`, with board position `A1` in the lower left-hand corner of the board. Files are case insensitive, e.g. File `B` is the same as `b`. Board positions must consist of File *then* Rank.
+1. Prerequisites: Make sure you've installed [Node.js] ≥ 12
+2. Install dependencies: `yarn install`
+3. Run the local development server: `yarn dev` (see `package.json` for a
+   full list of `scripts` you can run with `yarn`)
 
-```
-a3     // valid
-h6     // valid
-H6     // valid
+Now you'll have a local development environment backed by the NEAR TestNet!
 
-3a     // invalid, file must be first
-6h     // invalid, file must be first
-```
+Go ahead and play with the app and the code. As you make code changes, the app will automatically reload.
 
-### Moves
-Moves consist of at least two board positions. The first board position specifies the piece to be moved and the second board position specifies the destination of the piece. Additional destinations can be specified to make multiple jumps (double, triple, etc.).
 
-```
-a3 b4        // valid, move a3 to b4 (simple move)
-a5 c3 e1     // valid, move a5 to c3, e1 (double jump)
-e7 c5 a3 c1  // valid, move e7 to c5, a3, c1 (triple jump)
+Exploring The Code
+==================
 
-a3           // invalid, must specify destination
-a3b4         // invalid, missing space
-```
+1. The "backend" code lives in the `/contract` folder. See the README there for
+   more info.
+2. The frontend code lives in the `/src` folder. `/src/index.html` is a great
+   place to start exploring. Note that it loads in `/src/index.js`, where you
+   can learn how the frontend connects to the NEAR blockchain.
+3. Tests: there are different kinds of tests for the frontend and the smart
+   contract. See `contract/README` for info about how it's tested. The frontend
+   code gets tested with [jest]. You can run both of these at once with `yarn
+   run test`.
 
-### Error Messages
-**Illegal move**: the specified move is illegal. For example, it is illegal to:
-* move a piece that is not yours/doesn't exist
-* move/jump to a tile that is not on the board
-* move/jump to a tile that is occupied
-* jump your own tile
-* move men backwards
 
-**Must take jump**: at least one jump is available to the current player. Players are required to take jumps they are presented with. If a multi-jump is available, players are only required to make the first part of the jump. The remainder of the jump sequence is left to the player's discretion.
+Deploy
+======
 
-**You must specify at least two board positions**: each move must consist of at least two board positions. See the [Moves](#moves) section for more information.
-```
-> a3
-*** You must specify at least two board positions
-> a3 b4
-[OK]
-```
+Every smart contract in NEAR has its [own associated account][NEAR accounts]. When you run `yarn dev`, your smart contract gets deployed to the live NEAR TestNet with a throwaway account. When you're ready to make it permanent, here's how.
 
-**Board position must specify file/rank**: each board position must contain a file then rank.
-```
-> a
-*** Board position 'a' must specify rank
-> 3
-*** Board position '3' must specify file
-> a3 b4
-[OK]
-```
 
-**Rank cannot be zero**: the rank must be at least 1.
-```
-> b0
-*** Rank cannot be zero: 'b0'
-> b1
-[OK]
-```
+Step 0: Install near-cli (optional)
+-------------------------------------
 
-**Board position contains invalid character**: only alphanumeric characters are valid. Special characters and punctuation are not allowed. Additionally alpabetic characters are not allowed after numeric characters because File must be specified before Rank. The invalid character will be presented to the player:
-```
-> a$ b4
-*** Board position 'a$' contains invalid character '$'
-> 3a 4b
-*** Board position '3a' contains invalid character 'a'
-*** Board position '4b' contains invalid character 'b'
-> a3 b4
-[OK]
-```
+[near-cli] is a command line interface (CLI) for interacting with the NEAR blockchain. It was installed to the local `node_modules` folder when you ran `yarn install`, but for best ergonomics you may want to install it globally:
 
-### Winning
+    yarn install --global near-cli
 
-The game is over when the current player has no moves remaining. This could be because:
+Or, if you'd rather use the locally-installed version, you can prefix all `near` commands with `npx`
 
- * All of their pieces have been captured
- * All of their pieces are blocked from moving
+Ensure that it's installed with `near --version` (or `npx near --version`)
 
-In either case, the winner is the player that last moved. So, if it is Black's turn, and Black has no more pieces remaining, then Red wins.
+
+Step 1: Create an account for the contract
+------------------------------------------
+
+Each account on NEAR can have at most one contract deployed to it. If you've already created an account such as `your-name.testnet`, you can deploy your contract to `near-rusty-chekers.your-name.testnet`. Assuming you've already created an account on [NEAR Wallet], here's how to create `near-rusty-chekers.your-name.testnet`:
+
+1. Authorize NEAR CLI, following the commands it gives you:
+
+      near login
+
+2. Create a subaccount (replace `YOUR-NAME` below with your actual account name):
+
+      near create-account near-rusty-chekers.YOUR-NAME.testnet --masterAccount YOUR-NAME.testnet
+
+
+Step 2: set contract name in code
+---------------------------------
+
+Modify the line in `src/config.js` that sets the account name of the contract. Set it to the account id you used above.
+
+    const CONTRACT_NAME = process.env.CONTRACT_NAME || 'near-rusty-chekers.YOUR-NAME.testnet'
+
+
+Step 3: deploy!
+---------------
+
+One command:
+
+    yarn deploy
+
+As you can see in `package.json`, this does two things:
+
+1. builds & deploys smart contract to NEAR TestNet
+2. builds & deploys frontend code to GitHub using [gh-pages]. This will only work if the project already has a repository set up on GitHub. Feel free to modify the `deploy` script in `package.json` to deploy elsewhere.
+
+
+Troubleshooting
+===============
+
+On Windows, if you're seeing an error containing `EPERM` it may be related to spaces in your path. Please see [this issue](https://github.com/zkat/npx/issues/209) for more details.
+
+
+  [create-near-app]: https://github.com/near/create-near-app
+  [Node.js]: https://nodejs.org/en/download/package-manager/
+  [jest]: https://jestjs.io/
+  [NEAR accounts]: https://docs.near.org/docs/concepts/account
+  [NEAR Wallet]: https://wallet.testnet.near.org/
+  [near-cli]: https://github.com/near/near-cli
+  [gh-pages]: https://github.com/tschaub/gh-pages

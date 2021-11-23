@@ -1,4 +1,5 @@
 mod ai;
+
 pub use checkers::ai::{
 	Direction,
 	find_simple_moves_for_king,

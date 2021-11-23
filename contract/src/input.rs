@@ -1,4 +1,4 @@
-use checkers::board::BoardPosition;
+use crate::board::BoardPosition;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum InputError {
@@ -42,7 +42,7 @@ pub fn parse_move(the_move : &str) -> Result<Vec<BoardPosition>, InputError> {
 	let positions : Vec<_> = ok_iter.into_iter()
 		.filter_map(|position| position)
 		.collect();
-	
+
 	if positions.len() < 2 {
 		return Err(InputError::TooFewTokens);
 	}
@@ -55,24 +55,28 @@ pub fn parse_move(the_move : &str) -> Result<Vec<BoardPosition>, InputError> {
 // Expects a strict sequence of alphabetic characters (rank)
 // followed by a sequence of numeric characters (file).
 //
-fn token_validator(token : &str) -> Result<BoardPosition, TokenError> {	
-	let (file, rank) = try!(parse_file_rank(token));
+fn token_validator(token : &str) -> Result<BoardPosition, TokenError> {
+	let parse_file_rank_result = parse_file_rank(token);
+	match parse_file_rank_result {
+		Ok((file, rank)) => {
+			if file.is_empty() {
+				return Err(TokenError::MissingFile { token : token.to_string() });
+			}
+			if rank.is_empty() {
+				return Err(TokenError::MissingRank { token : token.to_string() });
+			}
 
-	if file.is_empty() {
-		return Err(TokenError::MissingFile { token : token.to_string() });
+			let row : usize = rank.parse::<usize>().unwrap();
+			let col : usize = file_to_row_position(&file);
+
+			if row == 0 {
+				return Err(TokenError::ZeroRank { token : token.to_string() });
+			}
+
+			Ok(BoardPosition::new(row - 1, col - 1))
+		},
+		Err(e) => Err(e)
 	}
-	if rank.is_empty() {
-		return Err(TokenError::MissingRank { token : token.to_string() });
-	}
-
-	let row : usize = rank.parse::<usize>().unwrap();
-	let col : usize = file_to_row_position(&file);
-
-	if row == 0 {
-		return Err(TokenError::ZeroRank { token : token.to_string() });
-	}
-
-	Ok(BoardPosition::new(row - 1, col - 1))
 }
 
 enum ParseState {
@@ -141,10 +145,10 @@ fn file_to_row_position(file : &str) -> usize {
 //
 fn char_to_position( c : char ) -> usize {
 	debug_assert!(c.is_alphabetic());
-	
+
 	match c {
-		'A'...'Z' => (c as usize) - ('A' as usize) + 1,
-		'a'...'z' => (c as usize) - ('a' as usize) + 1,
+		'A'..='Z' => (c as usize) - ('A' as usize) + 1,
+		'a'..='z' => (c as usize) - ('a' as usize) + 1,
 		_ => unreachable!()
 	}
 }
@@ -158,7 +162,7 @@ use checkers::BoardPosition;
 
 fn test_parse_move(the_move : &str, exp_result : Vec<BoardPosition>) {
 	let result = parse_move(the_move).ok().unwrap();
-	
+
 	assert_eq!(exp_result, result);
 }
 
@@ -178,7 +182,7 @@ ptest!(test_parse_move[
 
 fn test_parse_move_fail(the_move : &str, exp_result : InputError ) {
 	let result = parse_move(the_move).err().unwrap();
-	
+
 	assert_eq!(exp_result, result);
 }
 
@@ -205,7 +209,7 @@ ptest!(test_parse_move_fail[
 				TokenError::MissingFile {
 					token : "1".to_string() } ] }),
 
-	test_parse_move_fail_zero_rank("a1 a0", 
+	test_parse_move_fail_zero_rank("a1 a0",
 		InputError::InvalidTokens {
 			tokens : vec![
 				TokenError::ZeroRank {

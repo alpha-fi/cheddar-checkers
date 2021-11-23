@@ -1,5 +1,7 @@
-use checkers::player::Player;
+use crate::*;
+use crate::player::Player;
 
+#[derive(BorshDeserialize, BorshSerialize, PartialEq)]
 pub enum PieceType {
 	Man,
 	King
@@ -7,7 +9,7 @@ pub enum PieceType {
 
 pub trait Piece {
 	fn get_player_id(&self) -> u32;
-	
+
 	fn get_type(&self) -> PieceType;
 }
 
@@ -25,7 +27,7 @@ impl Piece for ManPiece {
 	fn get_player_id(&self) -> u32 {
 		self.player_id
 	}
-	
+
 	fn get_type(&self) -> PieceType {
 		PieceType::Man
 	}
@@ -45,7 +47,7 @@ impl Piece for KingPiece {
 	fn get_player_id(&self) -> u32 {
 		self.player_id
 	}
-	
+
 	fn get_type(&self) -> PieceType {
 		PieceType::King
 	}
