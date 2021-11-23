@@ -123,7 +123,6 @@ impl From<Game> for GameToSave {
     fn from(game: Game) -> Self {
         let board: BoardToSave = game.board.into();
 
-        log!("{} - {}", game.current_player_index, 1 - game.current_player_index);
         let (already_spent, spent_for_this_turn) =
             if game.turns <= 2 {
                 (0, 0)

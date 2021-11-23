@@ -5,9 +5,6 @@ use tile::{EmptyTile, OccupiedTile, Tile};
 use crate::*;
 use crate::tile::TileToSave;
 
-const CHECKERBOARD_SIZE: usize = 8;
-const CHECKERS_NUMBER_TILES: usize = CHECKERBOARD_SIZE * CHECKERBOARD_SIZE;
-
 #[derive(PartialEq, Eq, Debug, Hash, Copy, Clone)]
 pub struct BoardPosition {
     pub row: usize,
