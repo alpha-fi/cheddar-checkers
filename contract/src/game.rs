@@ -94,7 +94,7 @@ impl GameToSave {
             reward,
             winner_index: None,
             turns: 0,
-            last_turn_timestamp: [0, 0].to_vec(),
+            last_turn_timestamp: [env::block_timestamp(), 0].to_vec(),
             total_time_spent: [0, 0].to_vec(),
             board,
             current_player_index: 0,
@@ -124,20 +124,21 @@ impl From<Game> for GameToSave {
         let board: BoardToSave = game.board.into();
 
         let (already_spent, spent_for_this_turn) =
-            if game.turns <= 2 {
-                (0, 0)
-            } else {
                 (
                     game.total_time_spent[1 - game.current_player_index],
                     env::block_timestamp() - game.last_turn_timestamp[1 - game.current_player_index]
-                )
-            };
+                );
 
         let mut total_time_spent = game.total_time_spent;
         total_time_spent[1 - game.current_player_index] = already_spent + spent_for_this_turn;
 
         let mut last_turn_timestamp = game.last_turn_timestamp;
         last_turn_timestamp[1 - game.current_player_index] = env::block_timestamp();
+
+        // save opponent's time to enable timeout
+        if game.turns == 1 {
+            last_turn_timestamp[1] = env::block_timestamp();
+        }
 
         let game_to_save = GameToSave {
             player_1: game.players[0].clone(),
