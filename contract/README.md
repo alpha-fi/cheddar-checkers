@@ -2,8 +2,11 @@ NEAR Checkers
 
 Compilation of [Rust code "Rusty checkers"](https://github.com/dboone/rusty-checkers), [Plain Javascript UI](https://github.com/codethejason/checkers) and some glue from [near-api-js](https://docs.near.org/docs/api/javascript-library).
 
-[DEMO](https://checkers.nearspace.info/)
+[DEMO // NEAR Mainnet](https://checkers.nearspace.info/)
 
+User Interface: https://github.com/zavodil/near-checkers-ui
+
+Some Rules:
 - Set a bid and join waiting list or select an available player to start the game.
 - Winner gets a bank
 - Invite a friend to get a 10% referral bonus from his rewards.
