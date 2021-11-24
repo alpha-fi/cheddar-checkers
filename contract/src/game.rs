@@ -34,7 +34,7 @@ pub struct GameToSave {
     pub(crate) reward: Balance,
     pub(crate) winner_index: Option<usize>,
     pub(crate) turns: u64,
-    pub(crate) last_turn_timestamp: Vec<Timestamp>,
+    pub(crate) last_turn_timestamp: Timestamp,
     pub(crate) total_time_spent: Vec<Timestamp>,
 
     pub(crate) board: BoardToSave,
@@ -94,7 +94,7 @@ impl GameToSave {
             reward,
             winner_index: None,
             turns: 0,
-            last_turn_timestamp: [env::block_timestamp(), 0].to_vec(),
+            last_turn_timestamp: env::block_timestamp(),
             total_time_spent: [0, 0].to_vec(),
             board,
             current_player_index: 0,
@@ -109,7 +109,7 @@ pub struct Game {
     pub(crate) reward: Balance,
     pub(crate) winner_index: Option<usize>,
     pub(crate) turns: u64,
-    pub(crate) last_turn_timestamp: Vec<Timestamp>,
+    pub(crate) last_turn_timestamp: Timestamp,
     pub(crate) total_time_spent: Vec<Timestamp>,
     pub(crate) board: Board,
 
@@ -123,22 +123,11 @@ impl From<Game> for GameToSave {
     fn from(game: Game) -> Self {
         let board: BoardToSave = game.board.into();
 
-        let (already_spent, spent_for_this_turn) =
-                (
-                    game.total_time_spent[1 - game.current_player_index],
-                    env::block_timestamp() - game.last_turn_timestamp[1 - game.current_player_index]
-                );
+        let already_spent = game.total_time_spent[1 - game.current_player_index];
+        let spent_for_this_turn = env::block_timestamp() - game.last_turn_timestamp;
 
         let mut total_time_spent = game.total_time_spent;
         total_time_spent[1 - game.current_player_index] = already_spent + spent_for_this_turn;
-
-        let mut last_turn_timestamp = game.last_turn_timestamp;
-        last_turn_timestamp[1 - game.current_player_index] = env::block_timestamp();
-
-        // save opponent's time to enable timeout
-        if game.turns == 1 {
-            last_turn_timestamp[1] = env::block_timestamp();
-        }
 
         let game_to_save = GameToSave {
             player_1: game.players[0].clone(),
@@ -146,7 +135,7 @@ impl From<Game> for GameToSave {
             reward: game.reward,
             winner_index: game.winner_index,
             turns: game.turns,
-            last_turn_timestamp,
+            last_turn_timestamp: env::block_timestamp(),
             total_time_spent,
             board,
             current_player_index: game.current_player_index,
@@ -229,7 +218,7 @@ impl Game {
             reward,
             winner_index: None,
             turns: 0,
-            last_turn_timestamp: [0, 0].to_vec(),
+            last_turn_timestamp: 0,
             total_time_spent: [0, 0].to_vec(),
             board,
             current_player_index: 0,

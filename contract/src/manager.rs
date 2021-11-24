@@ -133,7 +133,7 @@ pub struct GameOutput {
     reward: U128,
     winner_index: Option<usize>,
     turns: u64,
-    last_turn_timestamp: Vec<Timestamp>,
+    last_turn_timestamp: Timestamp,
     total_time_spent: Vec<Timestamp>,
     board: BoardOutput
 }

@@ -301,7 +301,7 @@ impl Checkers {
                     game.total_time_spent[1]
                 }
                 else{
-                    env::block_timestamp() - game.last_turn_timestamp[1] + game.total_time_spent[1]
+                    env::block_timestamp() - game.last_turn_timestamp + game.total_time_spent[1]
                 };
             log!("Player {} already spent: {} nanoseconds", player_2, total_spent);
             assert!(total_spent > ONE_HOUR, "Too early to stop the game");
@@ -313,7 +313,7 @@ impl Checkers {
                     game.total_time_spent[0]
                 }
                 else{
-                    env::block_timestamp() - game.last_turn_timestamp[0] + game.total_time_spent[0]
+                    env::block_timestamp() - game.last_turn_timestamp + game.total_time_spent[0]
                 };
             log!("Player {} already spent: {} nanoseconds", player_1, total_spent);
             assert!(total_spent > ONE_HOUR, "Too early to stop the game");
