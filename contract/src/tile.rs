@@ -27,7 +27,7 @@ pub struct OccupiedTile {
 impl OccupiedTile {
     pub fn new( piece : Box<dyn Piece> ) -> OccupiedTile {
         OccupiedTile {
-            piece : piece
+            piece
         }
     }
 }

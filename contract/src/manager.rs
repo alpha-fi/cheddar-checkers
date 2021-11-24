@@ -58,20 +58,20 @@ pub struct Stats {
     games_num: u64,
     victories_num: u64,
     penalties_num: u64,
-    total_reward: Balance,
-    total_affiliate_reward: Balance,
+    total_reward: UnorderedMap<Option<AccountId>, Balance>,
+    total_affiliate_reward: UnorderedMap<Option<AccountId>, Balance>,
 }
 
 impl Stats {
-    pub fn new() -> Stats {
+    pub fn new(account_id: &AccountId) -> Stats {
         Stats {
             referrer_id: None,
-            affiliates: UnorderedSet::new(StorageKey::Affiliates),
+            affiliates: UnorderedSet::new(StorageKey::Affiliates { account_id: account_id.clone() }),
             games_num: 0,
             victories_num: 0,
             penalties_num: 0,
-            total_reward: 0,
-            total_affiliate_reward: 0,
+            total_reward: UnorderedMap::new(StorageKey::TotalRewards { account_id: account_id.clone() }),
+            total_affiliate_reward: UnorderedMap::new(StorageKey::TotalAffiliateRewards { account_id: account_id.clone() }),
         }
     }
 }
@@ -98,7 +98,7 @@ pub struct StatsOutput {
     victories_num: u64,
     penalties_num: u64,
     total_reward: U128,
-    total_affiliate_reward: U128,
+    total_affiliate_reward: U128
 }
 
 impl From<Stats> for StatsOutput {
@@ -109,18 +109,35 @@ impl From<Stats> for StatsOutput {
             games_num: stats.games_num,
             victories_num: stats.victories_num,
             penalties_num: stats.penalties_num,
-            total_reward: U128::from(stats.total_reward),
-            total_affiliate_reward: U128::from(stats.total_affiliate_reward),
+            // TODO Add FT
+            total_reward: U128::from(stats.total_reward.get(&None).unwrap_or(0)),
+            total_affiliate_reward: U128::from(stats.total_affiliate_reward.get(&None).unwrap_or(0)),
         }
     }
 }
 
-/*
+#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct TokenBalance {
+    pub(crate) token_id: Option<AccountId>,
+    pub(crate) balance: Balance,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
-pub struct BoardOutput{
-  pub(crate) board: [Vec<i8>; 8]
-}*/
+pub struct TokenBalanceOutput {
+    token_id: AccountId,
+    balance: U128,
+}
+
+impl From<TokenBalance> for TokenBalanceOutput {
+    fn from(token_balance: TokenBalance) -> Self {
+        TokenBalanceOutput {
+            token_id: token_balance.token_id.unwrap_or_else(|| "NEAR".into()),
+            balance: U128::from(token_balance.balance),
+        }
+    }
+}
 
 pub type BoardOutput = [Vec<i8>; 8];
 
@@ -130,12 +147,12 @@ pub struct GameOutput {
     player_1: AccountId,
     player_2: AccountId,
     current_player_index: usize,
-    reward: U128,
+    reward: TokenBalanceOutput,
     winner_index: Option<usize>,
     turns: u64,
     last_turn_timestamp: Timestamp,
     total_time_spent: Vec<Timestamp>,
-    board: BoardOutput
+    board: BoardOutput,
 }
 
 
@@ -151,7 +168,9 @@ pub enum UpdateStatsAction {
 }
 
 impl Checkers {
-    pub(crate) fn internal_distribute_reward(&mut self, amount: Balance, winner_id: &AccountId) {
+    pub(crate) fn internal_distribute_reward(&mut self, token_balance: &TokenBalance, winner_id: &AccountId) {
+        // TODO add for FT
+        let amount = token_balance.balance;
         let fee = amount / 10;
         let winner_reward: Balance = amount - fee;
         Promise::new(winner_id.clone()).transfer(winner_reward);
@@ -198,11 +217,15 @@ impl Checkers {
             stats.victories_num += 1;
         } else if action == UpdateStatsAction::AddTotalReward {
             if let Some(balance_unwrapped) = balance {
-                stats.total_reward += balance_unwrapped;
+                // TODO Add FT
+                let total_reward = stats.total_reward.get(&None).unwrap_or(0);
+                stats.total_reward.insert(&None, &(total_reward + balance_unwrapped));
             }
         } else if action == UpdateStatsAction::AddAffiliateReward {
             if let Some(balance_unwrapped) = balance {
-                stats.total_affiliate_reward += balance_unwrapped;
+                // TODO Add FT
+                let total_affiliate_reward = stats.total_affiliate_reward.get(&None).unwrap_or(0);
+                stats.total_affiliate_reward.insert(&None, &(total_affiliate_reward + balance_unwrapped));
             }
         } else if action == UpdateStatsAction::AddPenaltyGame {
             stats.penalties_num += 1;
@@ -227,7 +250,7 @@ impl Checkers {
         if let Some(stats) = self.stats.get(account_id) {
             stats.into()
         } else {
-            Stats::new()
+            Stats::new(&account_id)
         }
     }
 }
@@ -267,12 +290,12 @@ impl Checkers {
             player_1: game.players[0].account_id.clone(),
             player_2: game.players[1].account_id.clone(),
             current_player_index: game.current_player_index,
-            reward: U128::from(game.reward),
+            reward: game.reward.into(),
             winner_index: game.winner_index,
             turns: game.turns,
             last_turn_timestamp: game.last_turn_timestamp,
             total_time_spent: game.total_time_spent,
-            board: game.board.into()
+            board: game.board.into(),
         }
     }
 
@@ -299,5 +322,21 @@ impl Checkers {
 
     pub fn get_service_fee(&self) -> U128 {
         U128::from(self.service_fee)
+    }
+
+    #[private]
+    pub fn whitelist_token(&mut self, token_id: AccountId) {
+        self.whitelisted_tokens.insert(&token_id);
+    }
+
+    pub fn is_whitelisted_token(&self, token_id: AccountId) -> bool {
+        self.whitelisted_tokens.contains(&token_id)
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn assert_check_whitelisted_token(&self, token_id: &Option<AccountId>) {
+        if let Some(token_id) = token_id {
+            assert!(self.whitelisted_tokens.contains(&token_id), "Token wasn't whitelisted");
+        }
     }
 }

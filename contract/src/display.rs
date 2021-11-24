@@ -3,16 +3,15 @@ use near_sdk::{log};
 extern crate std;
 
 use crate::*;
-use Board;
 use piece::PieceType;
 use std::{char};
 
-const EMPTY_PIECE_STR : &'static str = " ";
+const EMPTY_PIECE_STR : &str = " ";
 
-const RED_MAN_STR : &'static str = "r";
-const RED_KING_STR : &'static str = "R";
-const BLACK_MAN_STR : &'static str = "b";
-const BLACK_KING_STR : &'static str = "B";
+const RED_MAN_STR : &str = "r";
+const RED_KING_STR : &str = "R";
+const BLACK_MAN_STR : &str = "b";
+const BLACK_KING_STR : &str = "B";
 
 fn print_justified_file (logs: &mut String, columns : usize, padding : usize) {
     for _ in 0..padding {
@@ -84,7 +83,7 @@ mod test {
 		let board = Board::new(1, 1);
 
 		let mut result = Vec::<u8>::new();
-		print_board(&mut result, &board).unwrap();
+		print_board(&board);
 
 		let exp_result = "   A\n1 [ ] 1\n   A\n";
 
@@ -96,7 +95,7 @@ mod test {
 		let board = Board::new(3, 3);
 
 		let mut result = Vec::<u8>::new();
-		print_board(&mut result, &board).unwrap();
+		print_board(&board);
 
 		let exp_result = concat!(
 			"   A  B  C\n",
@@ -113,7 +112,7 @@ mod test {
 		let board = Board::new(5, 3);
 
 		let mut result = Vec::<u8>::new();
-		print_board(&mut result, &board).unwrap();
+		print_board(&board);
 
 		let exp_result = concat!(
 			"   A  B  C\n",
@@ -145,7 +144,7 @@ mod test {
 		board.set_tile(0, 2, Box::new(OccupiedTile::new(Box::new(black_man))));
 		board.set_tile(4, 0, Box::new(OccupiedTile::new(Box::new(black_king))));
 
-		print_board(&mut result, &board).unwrap();
+		print_board(&board);
 
 		let exp_result = concat!(
 			"   A  B  C\n",

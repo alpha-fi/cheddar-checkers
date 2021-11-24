@@ -1,6 +1,6 @@
 use near_sdk::{AccountId, Balance, BorshStorageKey, env, log, near_bindgen, PanicOnDefault, setup_alloc, Timestamp};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{LookupMap, UnorderedMap};
+use near_sdk::collections::{LookupMap, LookupSet, UnorderedMap};
 use near_sdk::serde::{Deserialize, Serialize};
 
 pub use ai::{
@@ -51,11 +51,12 @@ enum StorageKey {
     AvailablePlayers,
     Stats,
     AvailableGames,
-    Affiliates,
+    Affiliates {account_id: AccountId},
+    TotalRewards {account_id: AccountId},
+    TotalAffiliateRewards{ account_id: AccountId},
+    WhitelistedTokens
 }
 
-// Structs in Rust are similar to other languages, and may include impl keyword as shown below
-// Note: the names of the structs are not important when calling the smart contract, but the function names are
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Checkers {
@@ -63,6 +64,7 @@ pub struct Checkers {
     available_players: UnorderedMap<AccountId, VGameConfig>,
     stats: UnorderedMap<AccountId, VStats>,
     available_games: UnorderedMap<GameId, (AccountId, AccountId)>,
+    whitelisted_tokens: LookupSet<AccountId>,
 
     next_game_id: GameId,
     service_fee: Balance,
@@ -77,6 +79,7 @@ impl Checkers {
             available_players: UnorderedMap::new(StorageKey::AvailablePlayers),
             stats: UnorderedMap::new(StorageKey::Stats),
             available_games: UnorderedMap::new(StorageKey::AvailableGames),
+            whitelisted_tokens: LookupSet::new(StorageKey::WhitelistedTokens),
 
             next_game_id: 0,
             service_fee: 0,
@@ -87,13 +90,11 @@ impl Checkers {
 #[near_bindgen]
 impl Checkers {
     pub(crate) fn internal_add_referral(&mut self, account_id: &AccountId, referrer_id: &Option<AccountId>) {
-        if self.stats.get(account_id).is_none() {
-            if self.is_account_exists(&referrer_id) {
-                if let Some(referrer_id_unwrapped) = referrer_id.clone() {
-                    self.internal_update_stats(account_id, UpdateStatsAction::AddReferral, referrer_id.clone(), None);
-                    self.internal_update_stats(&referrer_id_unwrapped, UpdateStatsAction::AddAffiliate, Some(account_id.clone()), None);
-                    log!("Referrer {} added for {}", referrer_id_unwrapped, account_id);
-                }
+        if self.stats.get(account_id).is_none() && self.is_account_exists(referrer_id) {
+            if let Some(referrer_id_unwrapped) = referrer_id.clone() {
+                self.internal_update_stats(account_id, UpdateStatsAction::AddReferral, referrer_id.clone(), None);
+                self.internal_update_stats(&referrer_id_unwrapped, UpdateStatsAction::AddAffiliate, Some(account_id.clone()), None);
+                log!("Referrer {} added for {}", referrer_id_unwrapped, account_id);
             }
         }
     }
@@ -101,13 +102,13 @@ impl Checkers {
     #[payable]
     pub fn make_available(&mut self, config: GameConfig, referrer_id: Option<AccountId>) {
         let account_id: &AccountId = &env::predecessor_account_id();
-        assert!(self.available_players.get(&account_id).is_none(), "Already in the waiting list the list");
+        assert!(self.available_players.get(account_id).is_none(), "Already in the waiting list the list");
         let deposit: Balance = env::attached_deposit();
-        assert!(deposit >= MIN_DEPOSIT, "Deposit is too small");
+        assert!(deposit >= MIN_DEPOSIT, "Deposit is too small. Attached: {}, Required: {}", deposit, MIN_DEPOSIT);
 
-        self.internal_check_if_has_game_started(&account_id);
+        self.internal_check_if_has_game_started(account_id);
 
-        self.internal_add_referral(&account_id, &referrer_id);
+        self.internal_add_referral(account_id, &referrer_id);
 
         self.available_players.insert(account_id,
                                       &VGameConfig::Current(GameConfig {
@@ -142,7 +143,11 @@ impl Checkers {
 
             let game_id = self.next_game_id;
 
-            let reward: u128 = config.deposit.unwrap_or(0) * 2;
+            // TODO Add FT
+            let reward = TokenBalance {
+                token_id: Some("NEAR".into()),
+                balance: config.deposit.unwrap_or(0) * 2,
+            };
 
             let game_to_save =
                 match config.first_move {
@@ -210,7 +215,7 @@ impl Checkers {
             (0, player_1)
         } else { panic!("No access") };
 
-        self.internal_distribute_reward(game.reward, &winner_account);
+        self.internal_distribute_reward(&game.reward, &winner_account);
         game.winner_index = Some(winner_index);
         self.games.insert(&game_id, &game);
 
@@ -238,7 +243,7 @@ impl Checkers {
                         }
                         GameState::GameOver { winner_id: winner_index } => {
                             let winner_account = game.players[winner_index].account_id.clone();
-                            self.internal_distribute_reward(game.reward, &winner_account);
+                            self.internal_distribute_reward(&game.reward, &winner_account);
                             game.winner_index = Some(winner_index);
 
                             self.internal_stop_game(game_id);
@@ -323,7 +328,7 @@ impl Checkers {
 
         self.internal_update_stats( &looser_account,UpdateStatsAction::AddPenaltyGame, None, None);
 
-        self.internal_distribute_reward(game.reward, &winner_account);
+        self.internal_distribute_reward(&game.reward, &winner_account);
         game.winner_index = Some(winner_index);
         self.games.insert(&game_id, &game);
 

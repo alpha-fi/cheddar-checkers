@@ -31,7 +31,7 @@ pub struct PlayerInfo {
 pub struct GameToSave {
     pub(crate) player_1: PlayerInfo,
     pub(crate) player_2: PlayerInfo,
-    pub(crate) reward: Balance,
+    pub(crate) reward: TokenBalance,
     pub(crate) winner_index: Option<usize>,
     pub(crate) turns: u64,
     pub(crate) last_turn_timestamp: Timestamp,
@@ -66,7 +66,7 @@ impl From<GameToSave> for Game {
 }
 
 impl GameToSave {
-    pub fn new(account_id_1: AccountId, account_id_2: AccountId, reward: Balance) -> GameToSave {
+    pub fn new(account_id_1: AccountId, account_id_2: AccountId, reward: TokenBalance) -> GameToSave {
         let (player1, player2) = Game::create_two_players();
 
         let board: BoardToSave = BoardToSave::new_checkerboard(&player1, &player2);
@@ -75,7 +75,7 @@ impl GameToSave {
     }
 
     fn with_board_and_players(board: BoardToSave, player1: Player, player2: Player,
-                              account_id_1: AccountId, account_id_2: AccountId, reward: Balance)
+                              account_id_1: AccountId, account_id_2: AccountId, reward: TokenBalance)
                               -> GameToSave {
         let player1_info = PlayerInfo {
             player: player1,
@@ -88,7 +88,7 @@ impl GameToSave {
             account_id: account_id_2,
         };
 
-        let game = GameToSave {
+        GameToSave {
             player_1: player1_info,
             player_2: player2_info,
             reward,
@@ -98,15 +98,13 @@ impl GameToSave {
             total_time_spent: [0, 0].to_vec(),
             board,
             current_player_index: 0,
-        };
-
-        game
+        }
     }
 }
 
 pub struct Game {
     pub(crate) players: [PlayerInfo; 2],
-    pub(crate) reward: Balance,
+    pub(crate) reward: TokenBalance,
     pub(crate) winner_index: Option<usize>,
     pub(crate) turns: u64,
     pub(crate) last_turn_timestamp: Timestamp,
@@ -129,7 +127,7 @@ impl From<Game> for GameToSave {
         let mut total_time_spent = game.total_time_spent;
         total_time_spent[1 - game.current_player_index] = already_spent + spent_for_this_turn;
 
-        let game_to_save = GameToSave {
+        GameToSave {
             player_1: game.players[0].clone(),
             player_2: game.players[1].clone(),
             reward: game.reward,
@@ -139,14 +137,12 @@ impl From<Game> for GameToSave {
             total_time_spent,
             board,
             current_player_index: game.current_player_index,
-        };
-
-        game_to_save
+        }
     }
 }
 
 impl Game {
-    pub fn new(account_id_1: AccountId, account_id_2: AccountId, reward: Balance) -> Game {
+    pub fn new(account_id_1: AccountId, account_id_2: AccountId, reward: TokenBalance) -> Game {
         let (player1, player2) = Game::create_two_players();
 
         let board = Board::new_checkerboard(&player1, &player2);
@@ -176,7 +172,9 @@ impl Game {
         Game::initialize_pieces(&mut board, &player1, &player1_positions);
         Game::initialize_pieces(&mut board, &player2, &player2_positions);
 
-        Game::with_board_and_players(board, player1, player2)
+        Game::with_board_and_players(board, player1, player2, "alice".into(),
+                                     "bob".into(),
+                                     TokenBalance{ token_id: Some("NEAR".into()), balance: 1 })
     }
 
     // creates and returns two players with distinct IDs
@@ -200,7 +198,7 @@ impl Game {
     }
 
     fn with_board_and_players(board: Board, player1: Player, player2: Player,
-                              account_id_1: AccountId, account_id_2: AccountId, reward: Balance)
+                              account_id_1: AccountId, account_id_2: AccountId, reward: TokenBalance)
                               -> Game {
         let player1_info = PlayerInfo {
             player: player1,
@@ -426,9 +424,16 @@ mod test {
 
     use super::*;
 
+    fn get_new_game() -> Game {
+        Game::new("alice".into(),
+                  "bob".into(),
+                  TokenBalance{ token_id: Some("NEAR".into()), balance: 1 }
+        )
+    }
+
     #[test]
     fn good_simple_move() {
-        let mut game = Game::new();
+        let mut game = get_new_game();
         let result = game.apply_simple_move(SimpleMove::new(2, 0, 3, 1));
         let exp_result: Result<GameState, MoveError> = Ok(GameState::InProgress);
         assert_eq!(exp_result, result);
@@ -443,7 +448,7 @@ mod test {
 
     #[test]
     fn bad_simple_move() {
-        let mut game = Game::new();
+        let mut game = get_new_game();
         let result = game.apply_simple_move(SimpleMove::new(2, 0, 3, 0));
         let exp_result: Result<GameState, MoveError> = Err(MoveError::InvalidMove);
         assert_eq!(exp_result, result);
@@ -507,7 +512,7 @@ mod test {
 
     #[test]
     fn bad_jump_move() {
-        let mut game = Game::new();
+        let mut game = get_new_game();
         let result = game.apply_jump_move(
             vec![BoardPosition::new(2, 0), BoardPosition::new(4, 2)]);
         let exp_result: Result<GameState, MoveError> = Err(MoveError::InvalidMove);

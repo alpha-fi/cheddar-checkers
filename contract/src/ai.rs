@@ -32,9 +32,9 @@ impl SimpleMove {
      to_column: usize)
      -> SimpleMove {
         SimpleMove {
-            from_row: from_row,
+            from_row,
             from_col: from_column,
-            to_row: to_row,
+            to_row,
             to_col: to_column,
 		}
     }
@@ -66,12 +66,12 @@ pub struct JumpMove {
 
 impl JumpMove {
     fn new(from_row: usize, from_col: usize) -> JumpMove {
-        JumpMove { from_row: from_row, from_col: from_col, jumps: Vec::new() }
+        JumpMove { from_row, from_col, jumps: Vec::new() }
     }
 
     #[cfg(test)]
     fn with_jumps(from_row: usize, from_col: usize, jumps: Vec<JumpMove>) -> JumpMove {
-        JumpMove { from_row: from_row, from_col: from_col, jumps: jumps }
+        JumpMove { from_row, from_col, jumps }
     }
 
     pub fn jumps(&self) -> &Vec<JumpMove> {
