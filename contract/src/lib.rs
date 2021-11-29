@@ -204,6 +204,7 @@ impl Checkers {
     pub fn give_up(&mut self, game_id: GameId) {
         assert_eq!(env::attached_deposit(), ONE_YOCTO, "Attach 1 yocto");
         let mut game: GameToSave = self.internal_get_game(&game_id);
+        assert!(game.winner_index.is_none(), "Game already finished");
         let account_id = env::predecessor_account_id();
 
         let player_1 = game.player_1.account_id.clone();
@@ -224,6 +225,7 @@ impl Checkers {
 
     pub fn make_move(&mut self, game_id: GameId, line: String) {
         let mut game: Game = self.internal_get_game(&game_id).into();
+        assert!(game.winner_index.is_none(), "Game already finished");
 
         let mut update_game = false;
         let active_player = game.current_player_account_id();
@@ -295,6 +297,8 @@ impl Checkers {
 
     pub fn stop_game(&mut self, game_id: GameId) {
         let mut game: GameToSave = self.internal_get_game(&game_id);
+        assert!(game.winner_index.is_none(), "Game already finished");
+
         let account_id = env::predecessor_account_id();
 
         let player_1 = game.player_1.account_id.clone();
