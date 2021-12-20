@@ -22,6 +22,8 @@ How to deploy
 
 `yarn build:contract`
 
+`near deploy app.checkers.near --wasmFile=./out/main.wasm --accountId app.checkers.near`
+
 - Create NFT contract (`/nft-contract`)
 
 `export CONTRACT_NAME=nft-checkers.testnet`

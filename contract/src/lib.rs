@@ -183,6 +183,7 @@ impl Checkers {
             self.next_game_id += 1;
 
             self.available_players.remove(&opponent_id);
+            self.available_players.remove(&account_id);
 
             self.internal_add_referral(&account_id, &referrer_id);
 
