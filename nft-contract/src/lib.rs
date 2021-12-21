@@ -6,8 +6,10 @@ use near_sdk::collections::LazyOption;
 use near_sdk::serde::{Deserialize, Serialize};
 
 use crate::web4::*;
+
 mod web4;
 const DEFAULT_ICON: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAABmJLR0QA/wD/AP+gvaeTAAACAUlEQVRIidXVOWhVURAG4C8vxmAwcSmCCIIiWrjggmBhYyfYiQoKoiDaCGKrha2FWAiCQqxcUlmlsBEttBAUJNHGQlwCbhGekSDRkOTF4szBm+vbsMvAcA+z/LOec1no1NlC340zuIQqtmMz1uE6luMlZv8n+GmMYS74aImzfAynGoFUGsjuYgD9bSTSj5u40wDvHzostWOuxKOYCh6to6/iUBmsPIM1WItH4bShkNWysO+Mc6YZDOFa+PzARFYWS6pIQxRZvm6z5E68CR/YUfQrVrBe2o6c7UVpi0jlDwQP4V1U2osObMOTCLIYv/C9HGAQu/AW+8Ipg1/Ae6kdM/iMp9iDJQE6jY84Fv6DInqmL1iFyQDpC/lVPG/Qnt04F+cJLEJPYK0Wgkwr4ttTAnnVALys6yucV+ZDW3vbhDpaGRQDjMd3UmHNsLWJ/5bCeSJ8iQEzv0Uj6MI9aUgHQn5EWtmfJfClocv0EA+kizqdhcUteia9K1P4hL3SdvRK21KNzLqwE2elpRDBb0QVw9LTMc78HlawPwBz+ee1ntMcLkuvag52H7UMmqlWMOrGpmzUgmax0d9LOdzKr9lj9zv4Qx19FQfbSEgFt+sANPofZL6lTjvr9beG4ziJb20kNBa2J9RpTbNf5oj0BH+Vtulx2NekQfbjSiTzoo1EFij9AUQdkBPH3hCPAAAAAElFTkSuQmCC";
+const NFT_CSS_SOURCE: &str = "/style";
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -23,13 +25,13 @@ enum StorageKey {
     Metadata,
     TokenMetadata,
     Enumeration,
-    Approval,
+    Approval
 }
 
 #[near_bindgen]
 impl NfTCheckers {
     #[init]
-    pub fn new_default_meta(owner_id: AccountId) -> Self {
+    pub fn new_with_default_meta(owner_id: AccountId) -> Self {
         Self::new(
             owner_id,
             NFTContractMetadata {
@@ -78,20 +80,17 @@ impl NfTCheckers {
         let token_id = get_token_id(&path).unwrap_or_default();
 
         if !token_id.is_empty() {
-            if let Some(token) = self.tokens.nft_token(token_id) {
-                let owner_id_css = token.owner_id.to_string()
-                   .replace(".", "_")
-                   .replace("-", "_");
-                let token_id_css = token.token_id.to_string()
-                   .replace(".", "_")
-                   .replace(" ", "_")
-                   .replace("-", "_");
-                return Web4Response::css_response(
-                    format!("div#board .piece.{}.{} {{
-                    background-image: url('{}');
-                    background-size: cover;
-                    background-repeat: unset;
-                }}", owner_id_css, token_id_css, token.metadata.expect("ERR_MISSING_DATA").media.unwrap_or_default()));
+            if path.starts_with(NFT_CSS_SOURCE) {
+                if let Some(token) = self.tokens.nft_token(token_id) {
+                    let owner_id_css = token.owner_id.to_string().replace(".", "_").replace("-", "_");
+                    let token_id_css = token.token_id.to_string().replace(".", "_").replace(" ", "_").replace("-", "_");
+                    return Web4Response::css_response(
+                        format!("div#board .piece.{}.{} {{
+background-image: url('{}');
+background-size: cover;
+background-repeat: unset;
+}}", owner_id_css, token_id_css, token.metadata.expect("ERR_MISSING_DATA").media.unwrap_or_default()));
+                }
             }
         }
 
