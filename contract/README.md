@@ -5,19 +5,19 @@ How to deploy
 
 - Create & deploy game contract (`/contract`)
 ### build
-RUSTFLAGS='-C link-arg=-s' cargo build --target wasm32-unknown-unknown --release
+RUSTFLAGS='-C link-arg=-s' cargo build --target wasm32-unknown-unknown --release. 
 
-### deploy (-f is optional for redeploy)
-near deploy -f --wasmFile target/wasm32-unknown-unknown/release/checkers.wasm --accountId $CONTRACT_ID
+### deploy (-f is optional for redeploy). 
+near deploy -f --wasmFile target/wasm32-unknown-unknown/release/checkers.wasm --accountId $CONTRACT_ID. 
 
-##### step 0
+##### step 0  
 
-initialize contract
-`near call $CONTRACT_ID new '{}' --accountId $CONTRACT_ID`
-whitelist cheddar (or any FT)
-`near call $CONTRACT_ID whitelist_token '{"token_id":"'token-v3.cheddar.testnet'"}' --accountId $CONTRACT_ID`
-check is_whitelisted_token
-`near call $CONTRACT_ID is_whitelisted_token '{"token_id":"'token-v3.cheddar.testnet'"}' --accountId $CONTRACT_ID`
+initialize contract  
+`near call $CONTRACT_ID new '{}' --accountId $CONTRACT_ID`  
+whitelist cheddar (or any FT)  
+`near call $CONTRACT_ID whitelist_token '{"token_id":"'token-v3.cheddar.testnet'"}' --accountId $CONTRACT_ID`  
+check is_whitelisted_token  
+`near call $CONTRACT_ID is_whitelisted_token '{"token_id":"'token-v3.cheddar.testnet'"}' --accountId $CONTRACT_ID`  
 
 ##### step 1 -> deposit to game and look available players
 
