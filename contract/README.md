@@ -6,6 +6,7 @@ How to deploy
 - Create & deploy game contract (`/contract`)
 ### build
 RUSTFLAGS='-C link-arg=-s' cargo build --target wasm32-unknown-unknown --release
+
 ### deploy (-f is optional for redeploy)
 near deploy -f --wasmFile target/wasm32-unknown-unknown/release/checkers.wasm --accountId $CONTRACT_ID
 
@@ -22,10 +23,13 @@ check is_whitelisted_token
 
 make_available -> join
 ---> NEAR
-`near call $CONTRACT_ID make_available '{"config": {"token_id":"'NEAR'","first_move": "Random"}, "referrer_id": null}' --accountId $USER_ACCOUNT_1 --depositYocto 10000000000000000000000`
+`near call $CONTRACT_ID make_available '{"config": {"token_id":"'NEAR'","first_move": "Random"}, "referrer_id": null}' --accountId
+$USER_ACCOUNT_1 --depositYocto 10000000000000000000000`
 ---> CHEDDAR(or any FT), (+30 Tgas for call)
-`near call token-v3.cheddar.testnet ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"1000000000000000000000000", "msg":"deposit"}' --accountId $USER_ACCOUNT_2 --depositYocto 1 --gas 300000000000000` this calls make_available_ft in contract
-`near call token-v3.cheddar.testnet ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"1000000000000000000000000", "msg":"deposit"}' --accountId $USER_ACCOUNT_3 --depositYocto 1 --gas 300000000000000` this calls make_available_ft in contract
+`near call token-v3.cheddar.testnet ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"1000000000000000000000000", "msg":"deposit"}' -
+accountId $USER_ACCOUNT_2 --depositYocto 1 --gas 300000000000000` this calls make_available_ft in contract
+`near call token-v3.cheddar.testnet ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"1000000000000000000000000", "msg":"deposit"}' -
+accountId $USER_ACCOUNT_3 --depositYocto 1 --gas 300000000000000` this calls make_available_ft in contract
 
 get_available_players
 `near call $CONTRACT_ID get_available_players '{"from_index":0, "limit": 50}' --accountId $CONTRACT_ID`
