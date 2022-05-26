@@ -1,8 +1,7 @@
 use near_sdk::{AccountId, Balance, BorshStorageKey, env, log, near_bindgen, PanicOnDefault, setup_alloc, Timestamp};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{LookupMap, LookupSet, UnorderedMap};
+use near_sdk::collections::{LookupMap, UnorderedMap};
 use near_sdk::serde::{Deserialize, Serialize};
-
 pub use ai::{
     Direction,
     find_jump_moves_for_king,
@@ -18,9 +17,13 @@ pub use input::{InputError, parse_move, TokenError};
 pub use piece::{KingPiece, ManPiece, Piece, PieceType};
 pub use player::Player;
 pub use tile::{EmptyTile, OccupiedTile, Tile};
+pub use token_interfaces::WhitelistedToken;
+
 
 use crate::game::GameToSave;
 use crate::manager::*;
+
+use crate::token_interfaces::{ONE_YOCTO, yoctoToToken};
 
 mod ai;
 mod board;
@@ -32,12 +35,13 @@ mod player;
 mod tile;
 mod util;
 mod manager;
+mod token_interfaces;
 
 type GameId = u64;
 
 // 0.01 NEAR
-const MIN_DEPOSIT: Balance = 10_000_000_000_000_000_000_000;
-const ONE_YOCTO: Balance = 1;
+const MIN_DEPOSIT_NEAR: Balance = 10_000_000_000_000_000_000_000;
+
 const ONE_HOUR: Timestamp = 3_600_000_000_000;
 
 const CHECKERBOARD_SIZE: usize = 8;
@@ -64,7 +68,7 @@ pub struct Checkers {
     available_players: UnorderedMap<AccountId, VGameConfig>,
     stats: UnorderedMap<AccountId, VStats>,
     available_games: UnorderedMap<GameId, (AccountId, AccountId)>,
-    whitelisted_tokens: LookupSet<AccountId>,
+    whitelisted_tokens: UnorderedMap<AccountId, WhitelistedToken>,
 
     next_game_id: GameId,
     service_fee: Balance,
@@ -79,7 +83,7 @@ impl Checkers {
             available_players: UnorderedMap::new(StorageKey::AvailablePlayers),
             stats: UnorderedMap::new(StorageKey::Stats),
             available_games: UnorderedMap::new(StorageKey::AvailableGames),
-            whitelisted_tokens: LookupSet::new(StorageKey::WhitelistedTokens),
+            whitelisted_tokens: UnorderedMap::new(StorageKey::WhitelistedTokens),
 
             next_game_id: 0,
             service_fee: 0,
@@ -89,11 +93,11 @@ impl Checkers {
 
 #[near_bindgen]
 impl Checkers {
-    pub(crate) fn internal_add_referral(&mut self, account_id: &AccountId, referrer_id: &Option<AccountId>) {
+    pub(crate) fn internal_add_referral(&mut self, token_id: Option<String>, account_id: &AccountId, referrer_id: &Option<AccountId>) {
         if self.stats.get(account_id).is_none() && self.is_account_exists(referrer_id) {
             if let Some(referrer_id_unwrapped) = referrer_id.clone() {
-                self.internal_update_stats(account_id, UpdateStatsAction::AddReferral, referrer_id.clone(), None);
-                self.internal_update_stats(&referrer_id_unwrapped, UpdateStatsAction::AddAffiliate, Some(account_id.clone()), None);
+                self.internal_update_stats(&token_id, account_id, UpdateStatsAction::AddReferral, referrer_id.clone(), None);
+                self.internal_update_stats(&token_id, &referrer_id_unwrapped, UpdateStatsAction::AddAffiliate, Some(account_id.clone()), None);
                 log!("Referrer {} added for {}", referrer_id_unwrapped, account_id);
             }
         }
@@ -103,19 +107,54 @@ impl Checkers {
     pub fn make_available(&mut self, config: GameConfig, referrer_id: Option<AccountId>) {
         let account_id: &AccountId = &env::predecessor_account_id();
         assert!(self.available_players.get(account_id).is_none(), "Already in the waiting list the list");
-        let deposit: Balance = env::attached_deposit();
-        assert!(deposit >= MIN_DEPOSIT, "Deposit is too small. Attached: {}, Required: {}", deposit, MIN_DEPOSIT);
-
+        let token_id = config.token_id.clone();
+        //SWITCH TOKEN OPTION
+        if token_id == Some("NEAR".into()) {
+            let deposit: Balance = env::attached_deposit();
+            assert!(deposit >= MIN_DEPOSIT_NEAR, "Deposit is too small. Attached: {}, Required: {}", deposit, MIN_DEPOSIT_NEAR);
+            self.available_players.insert(account_id,
+                &VGameConfig::Current(GameConfig {
+                    token_id: config.token_id,
+                    deposit: Some(deposit),
+                    first_move: config.first_move,
+                    opponent_id: config.opponent_id,
+            }));
+        } else {
+            match token_id {
+                Some(ref token_contract) => {
+                    log!(
+                        "Transfer some {} tokens to deposit into contract and make you available to start play",
+                        token_contract
+                    );
+                },
+                _ => panic!("token {:?} is not whitelisted", token_id )
+            }
+        }
         self.internal_check_if_has_game_started(account_id);
+        self.internal_add_referral(token_id, account_id, &referrer_id);
 
-        self.internal_add_referral(account_id, &referrer_id);
+    }
+    //calls in cross-contract transfer into checkers app
+    pub fn make_available_ft(&mut self, sender_id: AccountId, amount: u128, token_id: AccountId) {
+    
+        //get token data
+        let is_token_whitelisted = self.is_whitelisted_token(token_id.clone());
+        if is_token_whitelisted {
+            let decimals = self.get_token_decimals(token_id.clone());
 
-        self.available_players.insert(account_id,
-                                      &VGameConfig::Current(GameConfig {
-                                          deposit: Some(deposit),
-                                          first_move: config.first_move,
-                                          opponent_id: config.opponent_id,
-                                      }));
+            //create config
+                self.available_players.insert(&sender_id,
+                    &VGameConfig::Current(GameConfig {
+                        token_id: Some(token_id.clone()),
+                        deposit: Some(amount),
+                        first_move: FirstMoveOptions::Random,
+                        opponent_id: None,
+                    }));
+
+                log!("Success deposit from @{} with amount{} of '{:?}' contract ", sender_id.clone(), yoctoToToken(amount, decimals), token_id);
+        } else {
+            log!("Failed deposit from @{}. Game Config not found! ", sender_id.clone());
+        }
     }
 
     pub(crate) fn internal_check_if_has_game_started(&self, account_id: &AccountId) {
@@ -125,13 +164,12 @@ impl Checkers {
             .collect();
         assert_eq!(games_already_started.len(), 0, "Another game already started");
     }
-
+    
     #[payable]
     pub fn start_game(&mut self, opponent_id: AccountId, referrer_id: Option<AccountId>) -> GameId {
         if let Some(opponent_config) = self.available_players.get(&opponent_id) {
             let config: GameConfig = opponent_config.into();
-            assert_eq!(env::attached_deposit(), config.deposit.unwrap_or(0), "Wrong deposit");
-
+            
             let account_id = env::predecessor_account_id();
             assert_ne!(account_id.clone(), opponent_id.clone(), "Find a friend to play");
 
@@ -143,12 +181,15 @@ impl Checkers {
 
             let game_id = self.next_game_id;
 
-            // TODO Add FT
             let reward = TokenBalance {
-                token_id: Some("NEAR".into()),
+                token_id: config.token_id,
                 balance: config.deposit.unwrap_or(0) * 2,
             };
-
+            
+            let token_id = reward.token_id.clone();
+            if token_id.clone() == Some("NEAR".into()) {
+                assert_eq!(env::attached_deposit(), config.deposit.unwrap_or(0), "Wrong deposit");
+            }
             let game_to_save =
                 match config.first_move {
                     FirstMoveOptions::First => GameToSave::new(
@@ -184,11 +225,12 @@ impl Checkers {
 
             self.available_players.remove(&opponent_id);
             self.available_players.remove(&account_id);
-
-            self.internal_add_referral(&account_id, &referrer_id);
-
-            self.internal_update_stats(&account_id, UpdateStatsAction::AddPlayedGame, None, None);
-            self.internal_update_stats(&opponent_id, UpdateStatsAction::AddPlayedGame, None, None);
+            
+            //mistake
+            self.internal_add_referral(token_id.clone(), &account_id, &referrer_id);
+ 
+            self.internal_update_stats(&token_id, &account_id, UpdateStatsAction::AddPlayedGame, None, None);
+            self.internal_update_stats(&token_id, &opponent_id, UpdateStatsAction::AddPlayedGame, None, None);
 
             game_id
         } else {
@@ -203,6 +245,7 @@ impl Checkers {
 
     #[payable]
     pub fn give_up(&mut self, game_id: GameId) {
+        //assert one yocto
         assert_eq!(env::attached_deposit(), ONE_YOCTO, "Attach 1 yocto");
         let mut game: GameToSave = self.internal_get_game(&game_id);
         assert!(game.winner_index.is_none(), "Game already finished");
@@ -330,10 +373,11 @@ impl Checkers {
 
             (1, player_2, player_1)
         } else { panic!("No access") };
+        let token_balance = &game.reward;
+        let token_id = &token_balance.token_id;
+        self.internal_update_stats(&token_id, &looser_account,UpdateStatsAction::AddPenaltyGame, None, None);
 
-        self.internal_update_stats( &looser_account,UpdateStatsAction::AddPenaltyGame, None, None);
-
-        self.internal_distribute_reward(&game.reward, &winner_account);
+        self.internal_distribute_reward(token_balance, &winner_account);
         game.winner_index = Some(winner_index);
         self.games.insert(&game_id, &game);
 

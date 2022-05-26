@@ -190,7 +190,7 @@ impl Game {
     #[cfg(test)]
     fn initialize_pieces(board: &mut Board, player: &Player, positions: &Vec<BoardPosition>) {
         for pos in positions {
-            let piece = checkers::ManPiece::new(&player);
+            let piece = ManPiece::new(&player);
             let tile = OccupiedTile::new(Box::new(piece));
             assert!(board.get_tile(pos.row, pos.column).get_piece().is_none());
             board.set_tile(pos.row, pos.column, Box::new(tile));
@@ -418,9 +418,9 @@ impl Game {
 
 #[cfg(test)]
 mod test {
-    use checkers::BoardPosition;
-    use checkers::PieceType;
-    use checkers::SimpleMove;
+    use crate::BoardPosition;
+    use crate::PieceType;
+    use crate::SimpleMove;
 
     use super::*;
 

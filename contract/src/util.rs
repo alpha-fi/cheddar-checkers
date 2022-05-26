@@ -72,13 +72,4 @@ mod test {
 		let result = absolute_diff(a, b);
 		assert_eq!(expected, result);
 	}
-
-	ptest!(test_absolute_diff [
-		test_absolute_diff_0_0(0, 0, 0),
-		test_absolute_diff_0_1(0, 1, 1),
-		test_absolute_diff_1_0(1, 0, 1),
-		test_absolute_diff_1_1(1, 1, 0),
-		test_absolute_diff_9_3(9, 3, 6),
-		test_absolute_diff_3_12(3, 12, 9)
-	]);
 }
