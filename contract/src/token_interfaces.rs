@@ -7,8 +7,6 @@ use near_sdk::{ext_contract, AccountId, Balance, PanicOnDefault, PromiseOrValue}
 use near_sdk::{env, log, Promise, PromiseResult, Gas};
 
 use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
-use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
-//use near_contract_standards::fungible_token::resolver::FungibleTokenResolver;
 
 use crate::*;
 
@@ -158,6 +156,15 @@ impl Checkers {
         token_id: AccountId,
     ) -> Promise {
         assert_eq!(env::predecessor_account_id(), env::current_account_id(), "owner method");
+
+            //storage deposit for our contract for have ability to receive deposits in this token
+            ext_ft::storage_deposit (
+                env::predecessor_account_id(),
+                &token_id,
+                STORAGE_DEPOSIT,
+                CALLBACK_GAS
+            );
+
             ext_ft::ft_metadata(
                 &token_id,
                 NO_DEPOSIT,
@@ -192,13 +199,6 @@ impl Checkers {
                         metadata: ft_metadata,
                         balances: FungibleTokenBalances::new(token_id.clone().into())
                     },
-                );
-                //storage deposit for our contract for have ability to receive deposits in this token
-                ext_ft::storage_deposit (
-                    env::predecessor_account_id(),
-                    &token_id,
-                    STORAGE_DEPOSIT,
-                    CALLBACK_GAS
                 );
             }
         }
