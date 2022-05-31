@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use near_contract_standards::fungible_token::resolver::FungibleTokenResolver;
 use near_sdk::json_types::{U128, ValidAccountId};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::serde::{Deserialize, Serialize};
@@ -12,7 +11,8 @@ use crate::*;
 
 #[allow(dead_code)]
 pub const NO_DEPOSIT:u128 = 0;
-const STORAGE_DEPOSIT: u128 = 1250000000000000000000;
+const STORAGE_PRICE_PER_BYTE: u128 = 10000000000000000000;
+const STORAGE_DEPOSIT: u128 = 125 * STORAGE_PRICE_PER_BYTE;
 pub const CALLBACK_GAS:Gas = 5_000_000_000_000;
 pub const ONE_YOCTO: Balance = 1;
 //pub const GAS_FOR_FT_TRANSFER:Gas = 30_000_000_000_000;
@@ -31,7 +31,6 @@ pub trait FungibleToken {
 #[ext_contract(ext_self)]
 pub trait TokenInterfaces {
     fn on_ft_balance_of(&mut self, account_id: AccountId) -> Balance;
-    fn on_ft_transfer(&mut self, account_id: AccountId, amount: U128, token_id: String);
     fn ft_on_transfer(&mut self, sender_id: ValidAccountId, amount: U128, msg: String,) -> PromiseOrValue<U128>;
     fn on_ft_metadata(&mut self, token_id: AccountId);
 }
@@ -59,19 +58,20 @@ pub struct WhitelistedToken {
 }
 
 enum TransferInstruction {
-    Unknown,
-    Default,
+    DepositWithRefferer,
     Deposit,
 }
 
 //configure deposit actions via msg
+/*
+if msg in ft_transfer call is empty - its default deposit with no refferer
+if msg sended in format : 'account.testnet' - it inserts in make_available_ft function to add some refferal to available player
+*/
 impl From<String> for TransferInstruction {
     fn from(item: String) -> Self {
         match &item[..] {
-            "deposit" => TransferInstruction::Deposit,
-            "" => TransferInstruction::Default,
-
-            _ => TransferInstruction::Unknown,
+            "" => TransferInstruction::Deposit,
+            _ => TransferInstruction::DepositWithRefferer,
         }
     }
 }
@@ -86,6 +86,13 @@ impl FungibleTokenBalances {
         }
     }
     //balance check section
+    /*
+    For now, this section is unused. But it can used for check balance of fungible tokens and also
+    for checking is account have registered storage in fungible token contract. Because if account storage
+    not registered, this account cannot get transfer from other accounts. But in this game users first of all
+    deposit some money from their balances, which allows us don't check their storage or balances.
+    */
+    #[allow(unused)]
     pub fn check_storage_deposit(&self, account_id: AccountId, token_id: AccountId) {
         ext_ft::storage_balance_of(
             account_id.clone(), 
@@ -114,6 +121,7 @@ impl FungibleTokenBalances {
             }
         }
     }
+    #[allow(unused)]
     pub fn get_balance(&mut self, account_id: AccountId, token_id: AccountId) -> Promise {
         ext_ft::ft_balance_of(
             account_id.clone(),
@@ -128,7 +136,7 @@ impl FungibleTokenBalances {
             CALLBACK_GAS // gas to attach to the callback
         ))
     }
-
+    #[allow(unused)]
     pub fn on_ft_balance_of(&mut self, account_id: AccountId) -> Balance {
         assert_eq!(
             env::promise_results_count(),
@@ -210,6 +218,12 @@ impl Checkers {
             .expect("token isn't whitelisted");
         ft_whitelisted_token.metadata.decimals
     }
+    pub fn get_token_ticker(&self, token_id: String) -> String {
+        let ft_whitelisted_token = self.whitelisted_tokens
+            .get(&token_id)
+            .expect("token isn't whitelisted");
+        ft_whitelisted_token.metadata.symbol
+    }
     /*
         player calls ft_transfer_call in token_id contract for transfer amount of tokens to Checkers contract:
         PLAYER -> Checkers_contract 
@@ -226,27 +240,40 @@ impl Checkers {
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128> {
-        /*
-        if you want change usability to ft_transfer using, you need to check receiver storage deposit
-        self.check_storage_deposit(receiver_id, token_id)
-        */
 
         //token contract which calls this function
         let contract_id = env::predecessor_account_id();
-
+        let transfer_message: String = msg.clone();
         let sender: AccountId = sender_id.into();
 
-        match TransferInstruction::from(msg) {
+        match TransferInstruction::from(transfer_message) {
             TransferInstruction::Deposit => {
                 let amount_u128: u128 = amount.into();
-                log!("in deposit from @{} with token: {} amount {} ", sender, contract_id, amount_u128);
-                self.make_available_ft(sender, amount_u128, contract_id);
+                let ticker = self.get_token_ticker(contract_id.clone());
+                let referrer_id: Option<AccountId> = None;
+
+                log!("in deposit from @{} with token: ${} amount {} ", sender, ticker, amount_u128);
+                self.make_available_ft(sender, amount_u128, contract_id, referrer_id);
                 PromiseOrValue::Value(U128(0))
             },
-            TransferInstruction::Default => todo!(),
-            TransferInstruction::Unknown => {
-                log!("unknown msg from @{} with token: {} amount {} ", sender, contract_id, amount.0);
-                PromiseOrValue::Value(amount)
+            TransferInstruction::DepositWithRefferer => {
+                let amount_u128: u128 = amount.into();
+                let ticker = self.get_token_ticker(contract_id.clone());
+                let referrer_id: AccountId = msg.into();
+                assert!(
+                    env::is_valid_account_id(referrer_id.as_bytes()),
+                    "Refferal account @{} is invalid. If you wanna just make a deposit with no refferer don't attach any msg to ft_transfer_call!",
+                    referrer_id.clone()
+                );
+
+                log!("in deposit from @{} with token: ${} amount {} with refferer: @{} ",
+                    sender, 
+                    ticker, 
+                    amount_u128,
+                    referrer_id
+                );
+                self.make_available_ft(sender, amount_u128, contract_id, Some(referrer_id));
+                PromiseOrValue::Value(U128(0))
             }
         }
     }

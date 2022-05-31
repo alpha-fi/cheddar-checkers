@@ -176,6 +176,7 @@ pub enum UpdateStatsAction {
 }
 
 impl Checkers {
+
     pub(crate) fn internal_distribute_reward(&mut self, token_balance: &TokenBalance, winner_id: &AccountId) {
        
         let amount = token_balance.balance;
@@ -204,13 +205,31 @@ impl Checkers {
 
         log!("Winner is {}. Reward: {}", winner_id, winner_reward);
 
-        // TODO Add FT for referrer reward
+        // Referrer rewards
         let stats = self.internal_get_stats(winner_id);
         let referrer_fee = if let Some(referrer_id) = stats.referrer_id {
             let referrer_fee = fee / 2;
             log!("Affiliate reward for {} is {}", referrer_id, referrer_fee);
             self.internal_update_stats(&token_id, &referrer_id, UpdateStatsAction::AddAffiliateReward, None, Some(referrer_fee));
-            Promise::new(referrer_id.clone()).transfer(referrer_fee);
+
+            if token_id == Some("NEAR".into()) {
+                Promise::new(referrer_id.clone()).transfer(referrer_fee);
+            } else {
+                match token_id {
+                    Some(ref token_contract) => {
+                        ext_ft::ft_transfer(
+                            referrer_id.clone(),
+                            referrer_fee.to_string(),
+                            &token_contract,
+                            ONE_YOCTO,
+                            CALLBACK_GAS 
+                        );
+                    }
+                    _ => {
+                        panic!("no token_id find in contract") 
+                    }
+                }
+            }
             referrer_fee
         } else {
             0
@@ -238,6 +257,7 @@ impl Checkers {
         } else if action == UpdateStatsAction::AddReferral {
             if additional_account_id.is_some() {
                 stats.referrer_id = additional_account_id;
+                log!("referrer added here");
             }
         } else if action == UpdateStatsAction::AddAffiliate {
             if let Some(additional_account_id_unwrapped) = additional_account_id {
@@ -305,7 +325,7 @@ impl Checkers {
             })
             .collect()
     }
-
+    #[payable]
     pub fn make_unavailable(&mut self) -> PromiseOrValue<bool> {
         let account_id = env::predecessor_account_id();
         if let Some(v_game_config) = self.available_players.get(&account_id) {

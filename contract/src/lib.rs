@@ -100,6 +100,8 @@ impl Checkers {
                 self.internal_update_stats(&token_id, &referrer_id_unwrapped, UpdateStatsAction::AddAffiliate, Some(account_id.clone()), None);
                 log!("Referrer {} added for {}", referrer_id_unwrapped, account_id);
             }
+        } else {
+            log!("referrer was not added")
         }
     }
 
@@ -119,28 +121,29 @@ impl Checkers {
                     first_move: config.first_move,
                     opponent_id: config.opponent_id,
             }));
+            self.internal_check_if_has_game_started(account_id);
+            self.internal_add_referral(token_id, account_id, &referrer_id);
         } else {
             match token_id {
                 Some(ref token_contract) => {
+                    let ticker = self.get_token_ticker(token_contract.clone());
                     log!(
-                        "Transfer some {} tokens to deposit into contract and make you available to start play",
-                        token_contract
+                        "Transfer some ${} tokens to deposit into contract and make you available to start play",
+                        ticker
                     );
                 },
                 _ => panic!("token {:?} is not whitelisted", token_id )
             }
         }
-        self.internal_check_if_has_game_started(account_id);
-        self.internal_add_referral(token_id, account_id, &referrer_id);
-
     }
     //calls in cross-contract transfer into checkers app
-    pub fn make_available_ft(&mut self, sender_id: AccountId, amount: u128, token_id: AccountId) {
+    pub fn make_available_ft(&mut self, sender_id: AccountId, amount: u128, token_id: AccountId, referrer_id: Option<AccountId>) {
     
         //get token data
         let is_token_whitelisted = self.is_whitelisted_token(token_id.clone());
         if is_token_whitelisted {
             let decimals = self.get_token_decimals(token_id.clone());
+            let ticker = self.get_token_ticker(token_id.clone());
 
             //create config
                 self.available_players.insert(&sender_id,
@@ -151,7 +154,9 @@ impl Checkers {
                         opponent_id: None,
                     }));
 
-                log!("Success deposit from @{} with amount{} of '{:?}' contract ", sender_id.clone(), yoctoToToken(amount, decimals), token_id);
+            log!("Success deposit from @{} with amount {} of ${}' contract ", sender_id.clone(), yoctoToToken(amount, decimals), ticker);
+            self.internal_check_if_has_game_started(&sender_id);
+            self.internal_add_referral(Some(token_id), &sender_id, &referrer_id);
         } else {
             log!("Failed deposit from @{}. Game Config not found! ", sender_id.clone());
         }
@@ -185,6 +190,8 @@ impl Checkers {
                 token_id: config.token_id,
                 balance: config.deposit.unwrap_or(0) * 2,
             };
+
+            log!("game reward:  token {:?} ", reward.token_id.clone());
             
             let token_id = reward.token_id.clone();
             if token_id.clone() == Some("NEAR".into()) {
@@ -226,7 +233,6 @@ impl Checkers {
             self.available_players.remove(&opponent_id);
             self.available_players.remove(&account_id);
             
-            //mistake
             self.internal_add_referral(token_id.clone(), &account_id, &referrer_id);
  
             self.internal_update_stats(&token_id, &account_id, UpdateStatsAction::AddPlayedGame, None, None);

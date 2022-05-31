@@ -25,10 +25,12 @@ make_available -> join
 ---> NEAR  
 `near call $CONTRACT_ID make_available '{"config": {"token_id":"'NEAR'","first_move": "Random"}, "referrer_id": null}' --accountId
 $USER_ACCOUNT_1 --depositYocto 10000000000000000000000`  
----> CHEDDAR(or any FT), (+30 Tgas for call)  
-`near call token-v3.cheddar.testnet ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"1000000000000000000000000", "msg":"deposit"}' -
-accountId $USER_ACCOUNT_2 --depositYocto 1 --gas 300000000000000` this calls make_available_ft in contract  
-`near call token-v3.cheddar.testnet ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"1000000000000000000000000", "msg":"deposit"}' -
+---> CHEDDAR(or any FT), (+30 Tgas for call) 
+*no referral*
+`near call token-v3.cheddar.testnet ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"1000000000000000000000000", "msg":""}' -
+accountId $USER_ACCOUNT_2 --depositYocto 1 --gas 300000000000000` this calls make_available_ft in contract 
+*with referral_id = $USER_ACCOUNT_2* 
+`near call token-v3.cheddar.testnet ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"1000000000000000000000000", "msg":"USER_ACCOUNT_2"}' -
 accountId $USER_ACCOUNT_3 --depositYocto 1 --gas 300000000000000` this calls make_available_ft in contract  
 
 get_available_players  
