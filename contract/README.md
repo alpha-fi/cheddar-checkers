@@ -23,7 +23,7 @@ check is_whitelisted_token
 
 make_available -> join  
 ---> NEAR  
-`near call $CONTRACT_ID make_available '{"config": {"token_id":"'NEAR'","first_move": "Random"}, "referrer_id": null}' --accountId
+`near call $CONTRACT_ID make_available '{"config": {"first_move": "Random"}, "referrer_id": null}' --accountId
 $USER_ACCOUNT_1 --depositYocto 10000000000000000000000`  
 ---> CHEDDAR(or any FT), (+30 Tgas for call) 
 *no referral*
