@@ -118,8 +118,8 @@ impl Checkers {
                     first_move: config.first_move,
                     opponent_id: config.opponent_id,
             }));
-            self.internal_check_if_has_game_started(account_id);
-            self.internal_add_referral(token_id, &account_id, &referrer_id);
+        self.internal_check_if_has_game_started(&account_id);
+        self.internal_add_referral(token_id, &account_id, &referrer_id);
     }
     //calls in cross-contract transfer into checkers app
     pub fn make_available_ft(&mut self, sender_id: AccountId, amount: u128, token_id: AccountId, referrer_id: Option<AccountId>) {
