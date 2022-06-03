@@ -4,6 +4,8 @@ use near_sdk::json_types::U128;
 use token_interfaces::{ext_ft, CALLBACK_GAS, ONE_YOCTO};
 
 use crate::*;
+pub (crate) type TokenId = AccountId;
+pub (crate) type AffiliateId = AccountId;
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
@@ -58,13 +60,12 @@ impl From<GameConfig> for GameConfigOutput {
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct Stats {
     referrer_id: Option<AccountId>,
-    affiliates: UnorderedSet<AccountId>,
+    affiliates: UnorderedSet<AffiliateId>,
     games_num: u64,
     victories_num: u64,
     penalties_num: u64,
-    total_reward: UnorderedMap<Option<AccountId>, Balance>,
-    token_option: TokenBalanceOutput,
-    total_affiliate_reward: UnorderedMap<Option<AccountId>, Balance>,
+    total_reward: UnorderedMap<Option<TokenId>, Balance>,
+    total_affiliate_reward: UnorderedMap<Option<AffiliateId>, Balance>,
 }
 
 impl Stats {
@@ -76,7 +77,6 @@ impl Stats {
             victories_num: 0,
             penalties_num: 0,
             total_reward: UnorderedMap::new(StorageKey::TotalRewards { account_id: account_id.clone() }),
-            token_option: TokenBalanceOutput{ token_id: "NEAR".into(), balance: U128(0)},
             total_affiliate_reward: UnorderedMap::new(StorageKey::TotalAffiliateRewards { account_id: account_id.clone() }),
         }
     }
@@ -99,26 +99,26 @@ impl From<VStats> for Stats {
 #[serde(crate = "near_sdk::serde")]
 pub struct StatsOutput {
     referrer_id: Option<AccountId>,
-    affiliates: Vec<AccountId>,
+    affiliates: Vec<AffiliateId>,
     games_num: u64,
     victories_num: u64,
     penalties_num: u64,
+    token_id: TokenId,
     total_reward: U128,
-    token_id: AccountId,
-    total_affiliate_reward: U128
+    total_affiliate_reward: U128,
 }
 
-impl From<Stats> for StatsOutput {
-    fn from(stats: Stats) -> Self {
+impl StatsOutput {
+    fn from_by_token(stats: Stats, token_id: Option<TokenId>) -> StatsOutput {
         StatsOutput {
             referrer_id: stats.referrer_id,
             affiliates: stats.affiliates.to_vec(),
             games_num: stats.games_num,
             victories_num: stats.victories_num,
             penalties_num: stats.penalties_num,
-            token_id: AccountId::from(stats.token_option.token_id.clone()),
-            total_reward: U128::from(stats.total_reward.get(&Some(stats.token_option.token_id.clone())).unwrap_or(0)),
-            total_affiliate_reward: U128::from(stats.total_affiliate_reward.get(&Some(stats.token_option.token_id)).unwrap_or(0)),
+            token_id: token_id.clone().unwrap_or_else(|| "NEAR".into()),
+            total_reward: U128::from(stats.total_reward.get(&token_id).unwrap_or(0)),
+            total_affiliate_reward: U128::from(stats.total_affiliate_reward.get(&token_id).unwrap_or(0)),
         }
     }
 }
@@ -170,7 +170,6 @@ pub enum UpdateStatsAction {
     AddAffiliate,
     AddWonGame,
     AddTotalReward,
-    AddTokenId,
     AddAffiliateReward,
     AddPenaltyGame,
 }
@@ -273,10 +272,6 @@ impl Checkers {
                     .unwrap_or(0);
                 stats.total_reward.insert(&token_id, &(total_reward + balance_unwrapped));
             }
-        } else if action == UpdateStatsAction::AddTokenId {
-            if let Some(token_id) = token_id {
-                stats.token_option.token_id = token_id.to_string()
-            }
         } else if action == UpdateStatsAction::AddAffiliateReward {
             if let Some(balance_unwrapped) = balance {
                 //ft
@@ -297,10 +292,18 @@ impl Checkers {
     }
 
     pub(crate) fn is_account_exists(&self, account_id: &Option<AccountId>) -> bool {
-        if let Some(account_id_unwrapped) = account_id {
-            self.stats.get(account_id_unwrapped).is_some()
-        } else {
-            false
+        match account_id {
+            Some(account) => {
+                if let Some(_stats) = self.stats.get(account) {
+                    true
+                } else {
+                    false
+                }
+            }
+            None => {
+                log!("Account args was not added in function call!");
+                false
+            }
         }
     }
 
@@ -357,8 +360,9 @@ impl Checkers {
         }
     }
 
-    pub fn get_stats(&self, account_id: AccountId) -> StatsOutput {
-        self.internal_get_stats(&account_id).into()
+    pub fn get_stats(&self, account_id: AccountId, token_id: Option<TokenId>) -> StatsOutput {
+        let stats = self.internal_get_stats(&account_id);
+        StatsOutput::from_by_token(stats, token_id)
     }
 
     pub fn get_game(&self, game_id: GameId) -> GameOutput {

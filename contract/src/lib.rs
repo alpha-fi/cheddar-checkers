@@ -94,8 +94,10 @@ impl Checkers {
 #[near_bindgen]
 impl Checkers {
     pub(crate) fn internal_add_referral(&mut self, token_id: Option<String>, account_id: &AccountId, referrer_id: &Option<AccountId>) {
+        log!("is account refferal exists: {} ", self.is_account_exists(referrer_id));
         if self.stats.get(account_id).is_none() && self.is_account_exists(referrer_id) {
             if let Some(referrer_id_unwrapped) = referrer_id.clone() {
+                log!("in adding some referral");
                 self.internal_update_stats(&token_id, account_id, UpdateStatsAction::AddReferral, referrer_id.clone(), None);
                 self.internal_update_stats(&token_id, &referrer_id_unwrapped, UpdateStatsAction::AddAffiliate, Some(account_id.clone()), None);
                 log!("Referrer {} added for {}", referrer_id_unwrapped, account_id);
@@ -109,32 +111,20 @@ impl Checkers {
     pub fn make_available(&mut self, config: GameConfig, referrer_id: Option<AccountId>) {
         let account_id: &AccountId = &env::predecessor_account_id();
         assert!(self.available_players.get(account_id).is_none(), "Already in the waiting list the list");
-        let token_id = config.token_id.clone();
-        //SWITCH TOKEN OPTION
-        if token_id == Some("NEAR".into()) {
-            let deposit: Balance = env::attached_deposit();
-            assert!(deposit >= MIN_DEPOSIT_NEAR, "Deposit is too small. Attached: {}, Required: {}", deposit, MIN_DEPOSIT_NEAR);
+
+        let deposit: Balance = env::attached_deposit();
+        assert!(deposit >= MIN_DEPOSIT_NEAR, "Deposit is too small. Attached: {}, Required: {}", deposit, MIN_DEPOSIT_NEAR);
+
             self.available_players.insert(account_id,
                 &VGameConfig::Current(GameConfig {
-                    token_id: config.token_id,
+                    token_id: Some("NEAR".into()),
                     deposit: Some(deposit),
                     first_move: config.first_move,
                     opponent_id: config.opponent_id,
             }));
-            self.internal_check_if_has_game_started(account_id);
-            self.internal_add_referral(token_id, account_id, &referrer_id);
-        } else {
-            match token_id {
-                Some(ref token_contract) => {
-                    let ticker = self.get_token_ticker(token_contract.clone());
-                    log!(
-                        "Transfer some ${} tokens to deposit into contract and make you available to start play",
-                        ticker
-                    );
-                },
-                _ => panic!("token {:?} is not whitelisted", token_id )
-            }
-        }
+
+        self.internal_check_if_has_game_started(&account_id);
+        self.internal_add_referral(config.token_id, account_id, &referrer_id);
     }
     //calls in cross-contract transfer into checkers app
     pub fn make_available_ft(&mut self, sender_id: AccountId, amount: u128, token_id: AccountId, referrer_id: Option<AccountId>) {
@@ -154,11 +144,11 @@ impl Checkers {
                         opponent_id: None,
                     }));
 
-            log!("Success deposit from @{} with amount {} of ${}' contract ", sender_id.clone(), yoctoToToken(amount, decimals), ticker);
+            log!("Success deposit from @{} with {} ${} ", sender_id.clone(), yoctoToToken(amount, decimals), ticker);
             self.internal_check_if_has_game_started(&sender_id);
-            self.internal_add_referral(Some(token_id), &sender_id, &referrer_id);
+            self.internal_add_referral(Some(token_id.clone()), &sender_id, &referrer_id);
         } else {
-            log!("Failed deposit from @{}. Game Config not found! ", sender_id.clone());
+            panic!("Failed deposit from @{}. Token contract {} is not whitelisted! ", sender_id.clone(), token_id);
         }
     }
 
