@@ -2,6 +2,7 @@ use near_sdk::{AccountId, Balance, BorshStorageKey, env, log, near_bindgen, Pani
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedMap};
 use near_sdk::serde::{Deserialize, Serialize};
+use near_sdk::json_types::U128;
 pub use ai::{
     Direction,
     find_jump_moves_for_king,
@@ -93,6 +94,8 @@ impl Checkers {
 
 #[near_bindgen]
 impl Checkers {
+    //fixed - always false referrer. In function is_account_exists() is_some wasn't work correctly
+    //Now referrers and affiliates succesfully adding in contract
     pub(crate) fn internal_add_referral(&mut self, token_id: Option<String>, account_id: &AccountId, referrer_id: &Option<AccountId>) {
         log!("is account refferal exists: {} ", self.is_account_exists(referrer_id));
         if self.stats.get(account_id).is_none() && self.is_account_exists(referrer_id) {
@@ -127,8 +130,9 @@ impl Checkers {
         self.internal_add_referral(config.token_id, account_id, &referrer_id);
     }
     //calls in cross-contract transfer into checkers app
-    pub fn make_available_ft(&mut self, sender_id: AccountId, amount: u128, token_id: AccountId, referrer_id: Option<AccountId>) {
-    
+    pub fn make_available_ft(&mut self, sender_id: AccountId, amount: U128, referrer_id: Option<AccountId>) {
+        let token_id = env::predecessor_account_id();
+        let amount = amount.0;
         //get token data
         let is_token_whitelisted = self.is_whitelisted_token(token_id.clone());
         if is_token_whitelisted {

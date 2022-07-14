@@ -248,16 +248,14 @@ impl Checkers {
 
         match TransferInstruction::from(transfer_message) {
             TransferInstruction::Deposit => {
-                let amount_u128: u128 = amount.into();
                 let ticker = self.get_token_ticker(contract_id.clone());
                 let referrer_id: Option<AccountId> = None;
 
-                log!("in deposit from @{} with token: ${} amount {} ", sender, ticker, amount_u128);
-                self.make_available_ft(sender, amount_u128, contract_id, referrer_id);
+                log!("in deposit from @{} with token: ${} amount {:?} ", sender, ticker, amount);
+                self.make_available_ft(sender, amount, referrer_id);
                 PromiseOrValue::Value(U128(0))
             },
             TransferInstruction::DepositWithRefferer => {
-                let amount_u128: u128 = amount.into();
                 let ticker = self.get_token_ticker(contract_id.clone());
                 let referrer_id: AccountId = msg.into();
                 assert!(
@@ -266,13 +264,13 @@ impl Checkers {
                     referrer_id.clone()
                 );
 
-                log!("in deposit from @{} with token: ${} amount {} with refferer: @{} ",
+                log!("in deposit from @{} with token: ${} amount {:?} with refferer: @{} ",
                     sender, 
                     ticker, 
-                    amount_u128,
+                    amount,
                     referrer_id
                 );
-                self.make_available_ft(sender, amount_u128, contract_id, Some(referrer_id));
+                self.make_available_ft(sender, amount, Some(referrer_id));
                 PromiseOrValue::Value(U128(0))
             }
         }
