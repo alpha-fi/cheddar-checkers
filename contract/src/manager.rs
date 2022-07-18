@@ -266,19 +266,31 @@ impl Checkers {
             stats.victories_num += 1;
         } else if action == UpdateStatsAction::AddTotalReward {
             if let Some(balance_unwrapped) = balance {
-                //ft
-                let total_reward = stats.total_reward
-                    .get(&token_id)
-                    .unwrap_or(0);
-                stats.total_reward.insert(&token_id, &(total_reward + balance_unwrapped));
+                //near
+                if token_id == &Some("NEAR".into()) {
+                    let total_reward = stats.total_reward.get(&None).unwrap_or(0);
+                    stats.total_reward.insert(&None, &(total_reward + balance_unwrapped));
+                } else {
+                    //ft
+                    let total_reward = stats.total_reward
+                        .get(&token_id)
+                        .unwrap_or(0);
+                    stats.total_reward.insert(&token_id, &(total_reward + balance_unwrapped));
+                }
             }
         } else if action == UpdateStatsAction::AddAffiliateReward {
             if let Some(balance_unwrapped) = balance {
-                //ft
-                let total_affiliate_reward = stats.total_affiliate_reward
-                    .get(&token_id)
-                    .unwrap_or(0);
-                stats.total_affiliate_reward.insert(&token_id, &(total_affiliate_reward + balance_unwrapped));
+                //near
+                if token_id == &Some("NEAR".into()) {
+                    let total_affiliate_reward = stats.total_affiliate_reward.get(&None).unwrap_or(0);
+                    stats.total_affiliate_reward.insert(&None, &(total_affiliate_reward + balance_unwrapped));
+                } else {
+                    //ft
+                    let total_affiliate_reward = stats.total_affiliate_reward
+                        .get(&token_id)
+                        .unwrap_or(0);
+                    stats.total_affiliate_reward.insert(&token_id, &(total_affiliate_reward + balance_unwrapped));
+                }
             }
         } else if action == UpdateStatsAction::AddPenaltyGame {
             stats.penalties_num += 1;
@@ -362,6 +374,9 @@ impl Checkers {
 
     pub fn get_stats(&self, account_id: AccountId, token_id: Option<TokenId>) -> StatsOutput {
         let stats = self.internal_get_stats(&account_id);
+        if let Some(token_id) = token_id.clone() {
+            assert!(self.is_whitelisted_token(token_id), "Token isn't whitelisted!");
+        }
         StatsOutput::from_by_token(stats, token_id)
     }
 

@@ -245,18 +245,30 @@ impl Checkers {
         let contract_id = env::predecessor_account_id();
         let transfer_message: String = msg.clone();
         let sender: AccountId = sender_id.into();
+        let ticker = self.get_token_ticker(contract_id.clone());
+        let min_deposit = min_deposit(self.get_token_decimals(contract_id.clone()));
+        
+        assert!(
+            amount.0 >= min_deposit,
+            "Deposit in {} token is too small. Attached: {}, Required: {}", 
+            ticker,
+            amount.0,
+            min_deposit
+        );
 
         match TransferInstruction::from(transfer_message) {
             TransferInstruction::Deposit => {
-                let ticker = self.get_token_ticker(contract_id.clone());
                 let referrer_id: Option<AccountId> = None;
 
                 log!("in deposit from @{} with token: ${} amount {:?} ", sender, ticker, amount);
-                self.make_available_ft(sender, amount, referrer_id);
-                PromiseOrValue::Value(U128(0))
+                let available_complete = self.make_available_ft(sender, amount, referrer_id);
+                if available_complete {
+                    PromiseOrValue::Value(U128(0))
+                } else {
+                    PromiseOrValue::Value(amount)
+                }
             },
             TransferInstruction::DepositWithRefferer => {
-                let ticker = self.get_token_ticker(contract_id.clone());
                 let referrer_id: AccountId = msg.into();
                 assert!(
                     env::is_valid_account_id(referrer_id.as_bytes()),
@@ -270,8 +282,13 @@ impl Checkers {
                     amount,
                     referrer_id
                 );
-                self.make_available_ft(sender, amount, Some(referrer_id));
-                PromiseOrValue::Value(U128(0))
+
+                let available_complete =self.make_available_ft(sender, amount, Some(referrer_id));
+                if available_complete {
+                    PromiseOrValue::Value(U128(0))
+                } else {
+                    PromiseOrValue::Value(amount)
+                }
             }
         }
     }

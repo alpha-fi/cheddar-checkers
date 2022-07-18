@@ -130,9 +130,11 @@ impl Checkers {
         self.internal_add_referral(config.token_id, account_id, &referrer_id);
     }
     //calls in cross-contract transfer into checkers app
-    pub fn make_available_ft(&mut self, sender_id: AccountId, amount: U128, referrer_id: Option<AccountId>) {
+    pub fn make_available_ft(&mut self, sender_id: AccountId, amount: U128, referrer_id: Option<AccountId>) -> bool{
         let token_id = env::predecessor_account_id();
         let amount = amount.0;
+        //fix - many times deposits before game started
+        assert!(self.available_players.get(&sender_id.clone()).is_none(), "Already in the waiting list the list");
         //get token data
         let is_token_whitelisted = self.is_whitelisted_token(token_id.clone());
         if is_token_whitelisted {
@@ -151,8 +153,10 @@ impl Checkers {
             log!("Success deposit from @{} with {} ${} ", sender_id.clone(), yoctoToToken(amount, decimals), ticker);
             self.internal_check_if_has_game_started(&sender_id);
             self.internal_add_referral(Some(token_id.clone()), &sender_id, &referrer_id);
+            true
         } else {
-            panic!("Failed deposit from @{}. Token contract {} is not whitelisted! ", sender_id.clone(), token_id);
+            log!("Failed deposit from @{}. Token contract {} is not whitelisted! ", sender_id.clone(), token_id);
+            false
         }
     }
 
@@ -163,14 +167,31 @@ impl Checkers {
             .collect();
         assert_eq!(games_already_started.len(), 0, "Another game already started");
     }
-    
-    #[payable]
+    /// Start game between two players.
+    /// Not depends on token type, referrer for game is not required, but can be set.
+    /// Panics when:
+    /// - Opponent is not in available players
+    /// - Predecessor are not in available players
+    /// - Opponent and predecessor are the same accounts
+    /// - Predecessor actually have a started game
+    /// - Deposits from two players are different
     pub fn start_game(&mut self, opponent_id: AccountId, referrer_id: Option<AccountId>) -> GameId {
+        
         if let Some(opponent_config) = self.available_players.get(&opponent_id) {
             let config: GameConfig = opponent_config.into();
             
+            // Check is game initiator (predecessor) player available to play as well
             let account_id = env::predecessor_account_id();
+            assert!(self.available_players.get(&account_id).is_some(), "You are not in available players list!");
             assert_ne!(account_id.clone(), opponent_id.clone(), "Find a friend to play");
+
+            // Get predecessor's available deposit
+            let predecessor_deposit:u128 = if self.available_players.get(&account_id).is_some() {
+                let predecessor_config: GameConfig = self.available_players.get(&account_id).unwrap().into();
+                predecessor_config.deposit.unwrap_or(0)
+            } else {
+                0u128
+            };
 
             self.internal_check_if_has_game_started(&account_id);
 
@@ -185,12 +206,18 @@ impl Checkers {
                 balance: config.deposit.unwrap_or(0) * 2,
             };
 
+            // Deposits from two players must be equal
+            assert_eq!(
+                predecessor_deposit, 
+                config.deposit.unwrap_or(0), 
+                "Mismatched deposits for players! You: {}, Opponent {}",
+                predecessor_deposit,
+                config.deposit.unwrap_or(0)
+            );
+
             log!("game reward:  token {:?} ", reward.token_id.clone());
             
             let token_id = reward.token_id.clone();
-            if token_id.clone() == Some("NEAR".into()) {
-                assert_eq!(env::attached_deposit(), config.deposit.unwrap_or(0), "Wrong deposit");
-            }
             let game_to_save =
                 match config.first_move {
                     FirstMoveOptions::First => GameToSave::new(
