@@ -9,7 +9,7 @@ RUSTFLAGS="-C link-arg=-s" cargo build --target wasm32-unknown-unknown --release
 cp target/wasm32-unknown-unknown/release/*.wasm ./res/
 
 ```shell
-export CHECKERS_CONTRACT=dev-1658181188606-92103427848078
+export CHECKERS_CONTRACT=checkers.cheddar.testnet
 export CHEDDAR_CONTRACT=token-v3.cheddar.testnet
 export USER_ACCOUNT_1=rmlsnk.testnet
 export USER_ACCOUNT_2=participant_1.testnet
